@@ -13,6 +13,7 @@
 # Paul Chapman (paul [a../t] longweekendmobile 2010-04-01)
 # Repaired script to work with modern Ruby versions (1.86+), added comments,
 # made it support gaijin friendly transliterations!
+# Added kana2kana
 # ---------------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------------
@@ -246,7 +247,8 @@ module Kana2rom
   end
 
   def to_katakana
-    ## THIS LINE DOES NOT WORK IN RECENT RUBY VERSIONS!!!    r=""; w=[]; chars=str.split(//e)
+    return hira_to_kata(self) if self.is_hiragana?
+
     result=""
     word_buffer=[]
     chars=self.each_char.collect{|c| c}
@@ -333,14 +335,19 @@ module Kana2rom
   end
 
   # Added by Paul 2009-05-12 22:31
-  def kana2kana(str1)
-    result = []
-    str2 = Kana2rom::hira_to_kata(str1)
-    str3 = Kana2rom::kata_to_hira(str1)
-    result << str1
-    result << str2 if str2.length > 0 and str1 !=str2
-    result << str3 if str3.length > 0 and str2 !=str3 and str3 != str1
-    return result
+  # Modified by @chriskk 2013-03-26
+  def kana2kana
+    kana = ""
+    self.each_char do |c|
+      if c.is_hiragana?
+        kana << hira_to_kata(c)
+      elsif c.is_katakana?
+        kana << kata_to_hira(c)
+      else
+        kana << c
+      end
+    end
+    return kana
   end
 
   def to_hiragana
@@ -348,25 +355,27 @@ module Kana2rom
   end
 
   def is_kana?
-    if HiraganaCharacters.include?(self) == TRUE || KatakanaCharacters.include?(self) == TRUE
-      return true
-    end
-    return false
+    return (self.is_hiragana? || self.is_katakana?)
+  end
+
+  def is_hiragana?
+    chars = self.scan(/./)
+    return (chars - HiraganaCharacters).count > 0 ? false : true
+  end
+
+  def is_katakana?
+    chars = self.scan(/./)
+    return (chars - KatakanaCharacters).count > 0 ? false : true
   end
 
   def is_kanji?
-    if HiraganaCharacters.include?(self) == FALSE && KatakanaCharacters.include?(self) == FALSE && NotKanaCharacters.include?(self) == FALSE
-      return true
-    end
-    return false
-  end
+    return false if self.contains_kana? #catch all kana
 
-  def is_only_kana?
-    self.each_char do |character|
-      if HiraganaCharacters.include?(character) == FALSE && KatakanaCharacters.include?(character) == FALSE
-        return false
-      end
-    end
+    chars = self.scan(/./)
+    alpha_numerics = ('0'..'9').to_a + ('a'..'z').to_a + ('A'..'Z').to_a
+    return false if (alpha_numerics - chars).count != alpha_numerics.count #catch any alphanumerics
+    return false if (NotKanaCharacters - chars).count != NotKanaCharacters.count #catch doublebyte symbols
+
     return true
   end
 
